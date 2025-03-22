@@ -57,7 +57,7 @@ public class Board : MonoBehaviourPunCallbacks
             }
 
             //클릭 시작
-            if(Input.GetMouseButtonDown(0)) //좌클릭
+            if(Input.GetMouseButtonDown(0) && selectedPiece == null) //좌클릭 + 선택한 기물 없음
             {
                 Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}");
                 //해당 위치에 체스 기물이 있다면
@@ -69,12 +69,16 @@ public class Board : MonoBehaviourPunCallbacks
                 }
             }
 
-            if(Input.GetMouseButtonUp(0)) //좌클릭 해제제
+            if(Input.GetMouseButtonUp(0) && selectedPiece != null) //좌클릭 해제 + 선택한 기물 있음
             {
                 Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}입니다");
                 Debug.Log($"{selectedPiecePosition.x}, {selectedPiecePosition.y}입니다!");
                 Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
-                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos;
+                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동동
+                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
+                chessPieces[(int)hitPosition.x, (int)hitPosition.y] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
+                selectedPiece = null; //잡았던 기물 초기화
+                selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
             }
 
 
@@ -82,6 +86,13 @@ public class Board : MonoBehaviourPunCallbacks
         //레이가 안맞은 경우
         else
         {
+
+            if(Input.GetMouseButtonUp(0) && selectedPiece != null) //좌클릭 해제 + 선택한 기물 있음
+            {
+                selectedPiece = null; //잡았던 기물 초기화
+                selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+            }
+
             if(lastHitObject != null)
             {
                 lastHitObject.layer = originalLayer;
