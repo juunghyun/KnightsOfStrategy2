@@ -17,7 +17,7 @@ public class Board : MonoBehaviourPunCallbacks
     private GameObject selectedPiece = null; // 현재 선택된 기물
     private Vector2Int selectedPiecePosition = new Vector2Int(-1, -1); // 선택된 기물의 좌표
 
-    private GameObject myQueen;
+    private GameObject myKnight;
 
     //기물 위치 관리
     [SerializeField] private float yOffset = 0.05f;
@@ -156,34 +156,27 @@ public class Board : MonoBehaviourPunCallbacks
     private void SpawnAllPieces()
     {
         //추가 예정정
-        SpawnMyQueen();
+        SpawnMyKnight();
     }
 
 
     
 
-    private void SpawnMyQueen() //퀸 생성
+    private void SpawnMyKnight() //퀸 생성
     {
-        if(myTeam == 0) //방장이 백팀
-        {
-            Vector3 spawnPos = new Vector3(0 + xzOffset,0 + yOffset,0 + xzOffset);
-            myQueen = PhotonNetwork.Instantiate(
-                "QueenLight", 
-                spawnPos, 
-                Quaternion.identity
-            );
-            chessPieces[0,0] = myQueen;
-        }
-        else if(myTeam == 1) //참가자가 흑팀
-        {
-            Vector3 spawnPos = new Vector3(0 + xzOffset,0 + yOffset,7 + xzOffset);
-            myQueen = PhotonNetwork.Instantiate(
-                "QueenBlack", 
-                spawnPos, 
-                Quaternion.identity
-            );
-            chessPieces[0,7] = myQueen;
-        }
+        Vector3 spawnPos = myTeam == 0 
+        ? new Vector3(0 + xzOffset, 0 + yOffset, 0 + xzOffset)
+        : new Vector3(0 + xzOffset, 0 + yOffset, 7 + xzOffset);
+
+        string knightPrefab = myTeam == 0 ? "KnightLight" : "KnightBlack";
+        Quaternion rotation = myTeam == 0 ? Quaternion.Euler(0, 0, 0) : Quaternion.Euler(0, 180, 0);
+
+        myKnight = PhotonNetwork.Instantiate(knightPrefab, spawnPos, rotation);
+
+        int gridX = myTeam == 0 ? 0 : 0;
+        int gridY = myTeam == 0 ? 0 : 7;
+
+        chessPieces[gridX, gridY] = myKnight;
     }
 
     
