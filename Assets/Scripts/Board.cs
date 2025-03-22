@@ -1,4 +1,5 @@
 using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 using System.Collections;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -79,6 +80,8 @@ public class Board : MonoBehaviourPunCallbacks
                 chessPieces[(int)hitPosition.x, (int)hitPosition.y] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
                 selectedPiece = null; //잡았던 기물 초기화
                 selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+
+                ChangeTurn();
             }
 
 
@@ -150,6 +153,7 @@ public class Board : MonoBehaviourPunCallbacks
         }
     }
 
+    //턴 관련
     private void FindMyTurn()
     {
         if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Myturn", out object turnValue))
@@ -161,6 +165,19 @@ public class Board : MonoBehaviourPunCallbacks
         {
             Debug.LogError("턴턴 정보를 찾을 수 없습니다!");
         }
+    }
+
+    private void ChangeTurn()
+    {
+        myTurn = (myTurn == 1) ? 0 : 1;
+
+        // 네트워크 동기화
+        Hashtable props = new Hashtable();
+        props["Myturn"] = myTurn;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+
+        // UI 업데이트 등 필요한 작업 수행
+        Debug.Log($"턴 변경: {(myTurn == 1 ? "내 턴" : "상대 턴")}");
     }
 
 
@@ -190,5 +207,25 @@ public class Board : MonoBehaviourPunCallbacks
         chessPieces[gridX, gridY] = myKnight;
     }
 
+    public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        if (targetPlayer != PhotonNetwork.LocalPlayer) 
+        {
+            if (changedProps.ContainsKey("Myturn")) //내가 아닌 다른 누군가가 턴이 바뀌면
+            {
+                if((int)changedProps["Myturn"] == 1) //그사람의 턴이 1이댔다면
+                {
+                    myTurn = 0; //내턴은 0
+                }
+                else
+                {
+                    myTurn = 1;
+                }
+                
+                Debug.Log($"상대방 턴 변경: {(myTurn == 1 ? "내 턴" : "상대 턴")}");
+                // UI 업데이트 등 필요한 작업 수행
+            }
+        }
+    }
     
 }
