@@ -759,6 +759,10 @@ PrefabInstance:
       propertyPath: camera
       value: 
       objectReference: {fileID: 330585545}
+    - target: {fileID: 2828281151604369852, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
+      propertyPath: vfxSelectedPrefab
+      value: 
+      objectReference: {fileID: 8810667576024646485, guid: 22e290627b7959144857f5620980f73f, type: 3}
     - target: {fileID: 3771013607724237964, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.5
@@ -799,6 +803,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6881094675495785825, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
+      propertyPath: m_ProbeAnchor
+      value: 
+      objectReference: {fileID: 3025134394361422878, guid: 22e290627b7959144857f5620980f73f, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

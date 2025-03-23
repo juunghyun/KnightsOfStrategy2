@@ -16,7 +16,12 @@ public class Board : MonoBehaviourPunCallbacks
     private GameObject lastHitObject;
     private GameObject[,] chessPieces = new GameObject[8,8]; //각 좌표에 할당될 기물들 생성
     private GameObject selectedPiece = null; // 현재 선택된 기물
+    private bool isHoldingStart = false;
+    [SerializeField] private float selectedYOffset = 1f;
     private Vector2Int selectedPiecePosition = new Vector2Int(-1, -1); // 선택된 기물의 좌표
+    private Vector2Int selectedCheckPosition = new Vector2Int(-1, -1); //확인용 기물 좌표
+    public GameObject vfxSelectedPrefab; //선택한 기물 아래 생성할 vfx
+    private GameObject selectedVfx; //선택한 기물 효과 vfx 관리용
 
     private GameObject myKnight;
 
@@ -57,8 +62,8 @@ public class Board : MonoBehaviourPunCallbacks
                 lastHitObject = hitObj;
             }
 
-            //클릭 시작
-            if(Input.GetMouseButtonDown(0) && selectedPiece == null) //좌클릭 + 선택한 기물 없음
+            //첫번째 클릭 시작
+            if(Input.GetMouseButtonDown(0) && selectedPiece == null) //좌클릭 + 선택한 기물 없음 + 들고잇는 기물 없음
             {
                 Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}");
                 //해당 위치에 체스 기물이 있다면
@@ -66,22 +71,73 @@ public class Board : MonoBehaviourPunCallbacks
                 {
                     Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}에는 기물 존재");
                     selectedPiece = chessPieces[(int)hitPosition.x, (int)hitPosition.z]; //그 기물 선택한걸로 취급
-                    selectedPiecePosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z);
+                    selectedPiecePosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z); //해당 기물 좌표 저장
+                    isHoldingStart = true;
                 }
             }
 
-            if(Input.GetMouseButtonUp(0) && selectedPiece != null) //좌클릭 해제 + 선택한 기물 있음
+            if(Input.GetMouseButtonDown(0) && selectedPiece != null && !isHoldingStart) //좌클릭 + 선택한 기물 있음
+            {
+                selectedCheckPosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z);
+            }
+
+            if(Input.GetMouseButtonUp(0) && selectedPiece != null && !isHoldingStart) //좌클릭 해제 + 선택한 기물 있음 + 첫 기물 선택 후 떼는 동작이 아님
             {
                 Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}입니다");
                 Debug.Log($"{selectedPiecePosition.x}, {selectedPiecePosition.y}입니다!");
-                Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
-                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동동
-                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
-                chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
-                selectedPiece = null; //잡았던 기물 초기화
-                selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
 
-                ChangeTurn();
+                //같은곳 선택했으면 이동한것으로 처리 x
+                if((int)hitPosition.x == selectedPiecePosition.x && (int)hitPosition.z == selectedPiecePosition.y)
+                {
+                    //기물 착지시키기
+                    Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                    //기물 아래 vfx 없애기
+                    Destroy(selectedVfx);
+
+                    selectedPiece = null; //잡았던 기물 초기화
+                    selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+                    selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
+                }
+                //누른곳과 다른곳에 떨궈도 이동한것으로 처리 x
+                else if((int)hitPosition.x != selectedCheckPosition.x && (int)hitPosition.z!=selectedCheckPosition.y)
+                {
+                    //기물 착지시키기
+                    Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                    //기물 아래 vfx 없애기
+                    Destroy(selectedVfx);
+
+                    selectedPiece = null; //잡았던 기물 초기화
+                    selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+                    selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
+                }
+                else if((int)hitPosition.x == selectedCheckPosition.x && (int)hitPosition.z ==selectedCheckPosition.y)
+                {
+                    //선택 종료했으니 vfx 이펙트 삭제
+                    Destroy(selectedVfx);
+                    Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
+                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
+                    chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
+                    selectedPiece = null; //잡았던 기물 초기화
+                    selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+
+                    ChangeTurn();
+                }
+
+            }
+
+            //첫번째 고르고 타일에다가 커서를 두고 떼는 경우
+            if(Input.GetMouseButtonUp(0) && isHoldingStart)
+            {
+                //기물 띄우기
+                Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, selectedYOffset + yOffset, selectedPiecePosition.y + xzOffset);
+                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                //기물 아래 vfx 나오게 하기
+                Vector3 vfxPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                selectedVfx = Instantiate(vfxSelectedPrefab, vfxPos, Quaternion.identity);
+                isHoldingStart = false;
             }
 
 
@@ -89,9 +145,28 @@ public class Board : MonoBehaviourPunCallbacks
         //레이가 안맞은 경우
         else
         {
-
-            if(Input.GetMouseButtonUp(0) && selectedPiece != null) //좌클릭 해제 + 선택한 기물 있음
+            //첫번째 고르고 밖에다 커서를 두고 떼는 경우
+            if(Input.GetMouseButtonUp(0) && isHoldingStart)
             {
+                //기물 띄우기
+                Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, selectedYOffset + yOffset, selectedPiecePosition.y + xzOffset);
+                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                //기물 아래 vfx 나오게 하기
+                Vector3 vfxPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                selectedVfx = Instantiate(vfxSelectedPrefab, vfxPos, Quaternion.identity);
+
+                isHoldingStart = false;
+            }
+
+            //고른 상태에서 밖에 커서를 두고 떼는 경우
+            if(Input.GetMouseButtonUp(0) && selectedPiece != null && !isHoldingStart)
+            {
+                //기물 착지시키기
+                Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                //기물 아래 vfx 없애기
+                Destroy(selectedVfx);
+
                 selectedPiece = null; //잡았던 기물 초기화
                 selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
             }
