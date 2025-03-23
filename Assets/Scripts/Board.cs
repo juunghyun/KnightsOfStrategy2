@@ -62,11 +62,11 @@ public class Board : MonoBehaviourPunCallbacks
             {
                 Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}");
                 //해당 위치에 체스 기물이 있다면
-                if(chessPieces[(int)hitPosition.x, (int)hitPosition.y] != null)
+                if(chessPieces[(int)hitPosition.x, (int)hitPosition.z] != null)
                 {
                     Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}에는 기물 존재");
-                    selectedPiece = chessPieces[(int)hitPosition.x, (int)hitPosition.y]; //그 기물 선택한걸로 취급
-                    selectedPiecePosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.y);
+                    selectedPiece = chessPieces[(int)hitPosition.x, (int)hitPosition.z]; //그 기물 선택한걸로 취급
+                    selectedPiecePosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z);
                 }
             }
 
@@ -77,7 +77,7 @@ public class Board : MonoBehaviourPunCallbacks
                 Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
                 chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동동
                 chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
-                chessPieces[(int)hitPosition.x, (int)hitPosition.y] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
+                chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
                 selectedPiece = null; //잡았던 기물 초기화
                 selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
 
@@ -205,6 +205,7 @@ public class Board : MonoBehaviourPunCallbacks
         int gridY = myTeam == 0 ? 0 : 7;
 
         chessPieces[gridX, gridY] = myKnight;
+        Debug.Log($"{myTeam}팀이고,{gridX}, {gridY}에{chessPieces[gridX, gridY]}생성완료");
     }
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
