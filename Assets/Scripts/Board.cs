@@ -29,6 +29,11 @@ public class Board : MonoBehaviourPunCallbacks
     [SerializeField] private float yOffset = 0.05f;
     [SerializeField] private float xzOffset = 0.5f;
 
+    //애니메이션 처리 관리
+    public float moveDuration = 0.5f; // 이동 애니메이션 지속 시간
+
+    private Animator pieceAnimator;
+
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     private void Start()
@@ -71,6 +76,7 @@ public class Board : MonoBehaviourPunCallbacks
                 {
                     Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}에는 기물 존재");
                     selectedPiece = chessPieces[(int)hitPosition.x, (int)hitPosition.z]; //그 기물 선택한걸로 취급
+                    pieceAnimator = selectedPiece.GetComponent<Animator>();
                     selectedPiecePosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z); //해당 기물 좌표 저장
                     isHoldingStart = true;
                 }
@@ -96,6 +102,7 @@ public class Board : MonoBehaviourPunCallbacks
                     Destroy(selectedVfx);
 
                     selectedPiece = null; //잡았던 기물 초기화
+                    pieceAnimator = null;
                     selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
                     selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
                 }
@@ -109,6 +116,7 @@ public class Board : MonoBehaviourPunCallbacks
                     Destroy(selectedVfx);
 
                     selectedPiece = null; //잡았던 기물 초기화
+                    pieceAnimator = null;
                     selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
                     selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
                 }
@@ -116,11 +124,19 @@ public class Board : MonoBehaviourPunCallbacks
                 {
                     //선택 종료했으니 vfx 이펙트 삭제
                     Destroy(selectedVfx);
-                    Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
-                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+
+
+                    // Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
+                    // chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+
+                    Vector3 startPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                    Vector3 endPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
+                    StartCoroutine(MovePieceSmooth(chessPieces[selectedPiecePosition.x, selectedPiecePosition.y], startPos, endPos));
+
                     chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
                     chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
                     selectedPiece = null; //잡았던 기물 초기화
+                    pieceAnimator = null;
                     selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
 
                     ChangeTurn();
@@ -168,6 +184,7 @@ public class Board : MonoBehaviourPunCallbacks
                 Destroy(selectedVfx);
 
                 selectedPiece = null; //잡았던 기물 초기화
+                pieceAnimator = null;
                 selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
             }
 
@@ -302,6 +319,22 @@ public class Board : MonoBehaviourPunCallbacks
                 // UI 업데이트 등 필요한 작업 수행
             }
         }
+    }
+
+    //애니메이션 관련
+
+    private IEnumerator MovePieceSmooth(GameObject piece, Vector3 startPos, Vector3 endPos)
+    {
+        float elapsedTime = 0;
+        pieceAnimator.SetTrigger("Attack");
+        yield return new WaitForSeconds(0.49f);
+        while (elapsedTime < moveDuration)
+        {
+            piece.transform.position = Vector3.Lerp(startPos, endPos, elapsedTime / moveDuration);
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+        piece.transform.position = endPos; // 정확한 최종 위치 설정
     }
     
 }
