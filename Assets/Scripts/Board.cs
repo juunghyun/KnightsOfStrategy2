@@ -2,6 +2,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 public class Board : MonoBehaviourPunCallbacks
 {
@@ -15,6 +16,7 @@ public class Board : MonoBehaviourPunCallbacks
     public Camera camera;
     private GameObject lastHitObject;
     private GameObject[,] chessPieces = new GameObject[8,8]; //각 좌표에 할당될 기물들 생성
+    [SerializeField] private GameObject[] cubes; // 보드의 타일
     private GameObject selectedPiece = null; // 현재 선택된 기물
     private bool isHoldingStart = false;
     [SerializeField] private float selectedYOffset = 1f;
@@ -22,12 +24,20 @@ public class Board : MonoBehaviourPunCallbacks
     private Vector2Int selectedCheckPosition = new Vector2Int(-1, -1); //확인용 기물 좌표
     public GameObject vfxSelectedPrefab; //선택한 기물 아래 생성할 vfx
     private GameObject selectedVfx; //선택한 기물 효과 vfx 관리용
-
     private GameObject myKnight;
+
+    //GAME OBJECT 타일 material
+    public Material originalTileMaterial;
+    public Material rainbowTileMaterial;
+    public Material selectedTileMaterial;
+    private Renderer selectedTileRenderer;
 
     //기물 위치 관리
     [SerializeField] private float yOffset = 0.05f;
     [SerializeField] private float xzOffset = 0.5f;
+
+    //기물이 갈 수 있는 위치 관리
+    List<Vector2Int> availablePosition = new List<Vector2Int>();
 
     //애니메이션 처리 관리
     public float moveDuration = 0.5f; // 이동 애니메이션 지속 시간
@@ -77,6 +87,7 @@ public class Board : MonoBehaviourPunCallbacks
                     Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}에는 기물 존재");
                     selectedPiece = chessPieces[(int)hitPosition.x, (int)hitPosition.z]; //그 기물 선택한걸로 취급
                     pieceAnimator = selectedPiece.GetComponent<Animator>();
+                    selectedTileRenderer = hitObj.GetComponent<Renderer>();
                     selectedPiecePosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z); //해당 기물 좌표 저장
                     isHoldingStart = true;
                 }
@@ -100,11 +111,17 @@ public class Board : MonoBehaviourPunCallbacks
                     chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
                     //기물 아래 vfx 없애기
                     Destroy(selectedVfx);
+                    //뜬 기물 아래 타일 효과 없애기
+                    selectedTileRenderer.material = originalTileMaterial;
 
                     selectedPiece = null; //잡았던 기물 초기화
+                    selectedTileRenderer = null;
                     pieceAnimator = null;
                     selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
                     selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
+
+                    availableTileRefresh();
+                    availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
                 }
                 //누른곳과 다른곳에 떨궈도 이동한것으로 처리 x
                 else if((int)hitPosition.x != selectedCheckPosition.x && (int)hitPosition.z!=selectedCheckPosition.y)
@@ -114,32 +131,63 @@ public class Board : MonoBehaviourPunCallbacks
                     chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
                     //기물 아래 vfx 없애기
                     Destroy(selectedVfx);
+                    //뜬 기물 아래 타일 효과 없애기
+                    selectedTileRenderer.material = originalTileMaterial;
 
                     selectedPiece = null; //잡았던 기물 초기화
+                    selectedTileRenderer = null;
                     pieceAnimator = null;
                     selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
                     selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
+
+                    availableTileRefresh();
+                    availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
                 }
                 else if((int)hitPosition.x == selectedCheckPosition.x && (int)hitPosition.z ==selectedCheckPosition.y)
                 {
-                    //선택 종료했으니 vfx 이펙트 삭제
-                    Destroy(selectedVfx);
+                    if(availablePosition.Contains(selectedCheckPosition)){ //갈 수 있는 위치라면 가기
+                        //선택 종료했으니 vfx 이펙트 삭제
+                        Destroy(selectedVfx);
+                        //뜬 기물 아래 타일 효과 없애기
+                        selectedTileRenderer.material = originalTileMaterial;
 
+                        // Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
+                        // chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
 
-                    // Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
-                    // chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                        Vector3 startPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                        Vector3 endPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
+                        StartCoroutine(MovePieceSmooth(chessPieces[selectedPiecePosition.x, selectedPiecePosition.y], startPos, endPos));
 
-                    Vector3 startPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                    Vector3 endPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
-                    StartCoroutine(MovePieceSmooth(chessPieces[selectedPiecePosition.x, selectedPiecePosition.y], startPos, endPos));
+                        chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
+                        chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
+                        selectedPiece = null; //잡았던 기물 초기화
+                        selectedTileRenderer = null;
+                        pieceAnimator = null;
+                        selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+                        availableTileRefresh();
+                        availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
 
-                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
-                    chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
-                    selectedPiece = null; //잡았던 기물 초기화
-                    pieceAnimator = null;
-                    selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+                        ChangeTurn();
+                    }
+                    else //갈 수 없는 위치라면 
+                    {
+                        //기물 착지시키기
+                        Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
+                        chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
+                        //기물 아래 vfx 없애기
+                        Destroy(selectedVfx);
+                        //뜬 기물 아래 타일 효과 제거
+                        selectedTileRenderer.material = originalTileMaterial;
 
-                    ChangeTurn();
+                        selectedPiece = null; //잡았던 기물 초기화
+                        selectedTileRenderer = null;
+                        pieceAnimator = null;
+
+                        availableTileRefresh();
+                        availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
+                        selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+                    }
+                    
                 }
 
             }
@@ -153,6 +201,11 @@ public class Board : MonoBehaviourPunCallbacks
                 //기물 아래 vfx 나오게 하기
                 Vector3 vfxPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
                 selectedVfx = Instantiate(vfxSelectedPrefab, vfxPos, Quaternion.identity);
+                //뜬 기물 아래 타일 효과
+                selectedTileRenderer.material = rainbowTileMaterial;
+                //고른 기물이 갈 수 있는 위치 계산
+                findAvailableMoves(selectedPiece, selectedPiecePosition.x, selectedPiecePosition.y);
+
                 isHoldingStart = false;
             }
 
@@ -170,6 +223,11 @@ public class Board : MonoBehaviourPunCallbacks
                 //기물 아래 vfx 나오게 하기
                 Vector3 vfxPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
                 selectedVfx = Instantiate(vfxSelectedPrefab, vfxPos, Quaternion.identity);
+                //뜬 기물 아래 타일 효과
+                selectedTileRenderer.material = rainbowTileMaterial;
+
+                //고른 기물이 갈 수 있는 위치 계산
+                findAvailableMoves(selectedPiece, selectedPiecePosition.x, selectedPiecePosition.y);
 
                 isHoldingStart = false;
             }
@@ -182,10 +240,16 @@ public class Board : MonoBehaviourPunCallbacks
                 chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
                 //기물 아래 vfx 없애기
                 Destroy(selectedVfx);
+                //뜬 기물 아래 타일 효과 제거
+                selectedTileRenderer.material = originalTileMaterial;
 
                 selectedPiece = null; //잡았던 기물 초기화
+                selectedTileRenderer = null;
                 pieceAnimator = null;
                 selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
+                
+                availableTileRefresh();
+                availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
             }
 
             if(lastHitObject != null)
@@ -272,15 +336,12 @@ public class Board : MonoBehaviourPunCallbacks
         Debug.Log($"턴 변경: {(myTurn == 1 ? "내 턴" : "상대 턴")}");
     }
 
-
+    //기물 관련련
     private void SpawnAllPieces()
     {
         //추가 예정정
         SpawnMyKnight();
     }
-
-
-    
 
     private void SpawnMyKnight() //퀸 생성
     {
@@ -298,6 +359,75 @@ public class Board : MonoBehaviourPunCallbacks
 
         chessPieces[gridX, gridY] = myKnight;
         Debug.Log($"{myTeam}팀이고,{gridX}, {gridY}에{chessPieces[gridX, gridY]}생성완료");
+    }
+
+    private void findAvailableMoves(GameObject objectName, int x, int y)
+    {
+        if (objectName == myKnight) // 나이트인 경우
+        {
+            availablePosition = new List<Vector2Int>();
+
+            // 이동 방향 (상, 하, 좌, 우)
+            int[,] directions = new int[,] {
+                { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } // 위, 아래, 왼쪽, 오른쪽
+            };
+
+            for (int d = 0; d < 4; d++) // 네 방향 탐색
+            {
+                for (int step = 1; step <= 2; step++) // 최대 2칸까지 이동 가능
+                {
+                    int newX = x + directions[d, 0] * step;
+                    int newY = y + directions[d, 1] * step;
+
+                    // 보드 범위를 벗어나지 않는지 확인
+                    if (newX >= 0 && newX < 8 && newY >= 0 && newY < 8)
+                    {
+                        // 해당 위치에 기물이 없을 경우만 추가
+                        if (chessPieces[newX, newY] == null)
+                        {
+                            availablePosition.Add(new Vector2Int(newX, newY));
+                        }
+                        else // 기물이 있으면 더 이상 해당 방향으로 이동 불가
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            //availablePosition으로 해당 타일 변경하기
+            foreach (Vector2Int pos in availablePosition)
+            {
+                int index = pos.x + pos.y * 8;
+                if (index < cubes.Length && cubes[index] != null)
+                {
+                    Renderer renderer = cubes[index].GetComponent<Renderer>();
+                    renderer.material = selectedTileMaterial;
+                }
+            }
+
+
+            // 가능한 위치 출력 (디버깅용)
+            foreach (var move in availablePosition)
+            {
+                Debug.Log($"특수 나이트 이동 가능: ({move.x}, {move.y})");
+            }
+        }
+    }
+
+    private void availableTileRefresh(){
+
+        //availablePosition 타일 복귀귀
+        foreach (Vector2Int pos in availablePosition)
+        {
+            int index = pos.x + pos.y * 8;
+            if (index < cubes.Length && cubes[index] != null)
+            {
+                Renderer renderer = cubes[index].GetComponent<Renderer>();
+                renderer.material = originalTileMaterial;
+            }
+        }
+
     }
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
