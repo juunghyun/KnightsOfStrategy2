@@ -4,6 +4,9 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
+using Unity.VisualScripting;
+
+[RequireComponent(typeof(PhotonView))]
 public class Board : MonoBehaviourPunCallbacks
 {
     //UI
@@ -11,6 +14,13 @@ public class Board : MonoBehaviourPunCallbacks
     private int originalLayer;
     private int myTeam = -1;
     private int myTurn = -1;
+    
+    //동기화 관리
+    private List<Vector2Int> enemyPiecesList = new List<Vector2Int>();
+    int [] myChessPiecesX;
+    int [] myChessPiecesY;
+    int newnewY = 0;
+    private PhotonView PV;
 
     //GAME OBJECT 관리
     public Camera camera;
@@ -49,6 +59,11 @@ public class Board : MonoBehaviourPunCallbacks
     private void Start()
     {
         PhotonNetwork.AddCallbackTarget(this);
+        PV = GetComponent<PhotonView>();
+        if (PV == null)
+        {
+            Debug.LogError("PhotonView component not found on this GameObject!");
+        }
     }
 
     private void Update()
@@ -160,6 +175,44 @@ public class Board : MonoBehaviourPunCallbacks
 
                         chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
                         chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
+
+                        // TODO
+                        myChessPiecesX = new int[1];
+                        myChessPiecesY = new int[1];
+                        int index = 0;
+                        for (int x = 0; x < 8; x++)
+                        {
+                            for (int y = 0; y < 8; y++)
+                            {
+                                if(chessPieces[x, y] != null)
+                                {
+                                    myChessPiecesX[index] = x;
+                                    myChessPiecesY[index] = y;
+                                    Debug.Log($"{myChessPiecesX[0]}, {myChessPiecesY[0]} add");
+                                    index++;
+                                }
+                            }
+                        }
+
+                        Debug.Log($"myChessPieces넣기 완료");
+
+                        if (PV != null)
+                            {
+                                // 오너쉽 요청 (필요시)
+                                if (!PV.IsMine && myTurn == 1)
+                                {
+                                    PV.RequestOwnership();
+                                }
+                                // RPC 호출 조건 변경
+                                if (myTurn == 1) // 👉 턴 시스템과 연동
+                                    {
+                                        //TODO
+                                        PV.RPC("enemyChessPiecesUpdate", RpcTarget.All, myChessPiecesX, myChessPiecesY);
+                                        Debug.Log($"Sent fin!");
+                                    }
+                            }
+
+
                         selectedPiece = null; //잡았던 기물 초기화
                         selectedTileRenderer = null;
                         pieceAnimator = null;
@@ -449,6 +502,31 @@ public class Board : MonoBehaviourPunCallbacks
                 // UI 업데이트 등 필요한 작업 수행
             }
         }
+    }
+
+    // private void UpdateMyChessPiecesList()
+    // {
+    //     myChessPieces.Clear();
+    //     myChessPieces.Add(new Vector2Int(3, 3));
+    //     myChessPieces.Add(new Vector2Int(3, 4));
+    //     myChessPieces.Add(new Vector2Int(4, 3));
+    //     myChessPieces.Add(new Vector2Int(4, 4));
+    // }
+
+    [PunRPC]
+    private void enemyChessPiecesUpdate(int []xArr, int []yArr)
+    {
+
+        enemyPiecesList.Clear();
+
+        for (int i = 0; i < xArr.Length; i++)
+        {
+            enemyPiecesList.Add(new Vector2Int(xArr[i], yArr[i]));
+        }
+
+        // 디버그 정보 출력
+        Debug.Log($"Enemy pieces updated: {xArr.Length} 개의 좌표 received");
+        Debug.Log($"{enemyPiecesList[0].x}, {enemyPiecesList[0].y} received");
     }
 
     //애니메이션 관련

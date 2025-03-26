@@ -2502,6 +2502,7 @@ MonoBehaviour:
   vfxSelectedPrefab: {fileID: 8810667576024646485, guid: 22e290627b7959144857f5620980f73f, type: 3}
   originalTileMaterial: {fileID: 2100000, guid: e62b5674debd37d48853b782f1e82005, type: 2}
   rainbowTileMaterial: {fileID: 2100000, guid: 84125f537f9f93140b39fc06d19bc926, type: 2}
+  selectedTileMaterial: {fileID: 0}
   yOffset: 0.05
   xzOffset: 0.5
   moveDuration: 0.5
