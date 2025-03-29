@@ -9,307 +9,101 @@ using Unity.VisualScripting;
 [RequireComponent(typeof(PhotonView))]
 public class Board : MonoBehaviourPunCallbacks
 {
-    //UI
-    
-    private int originalLayer;
-    private int myTeam = -1;
-    private int myTurn = -1;
-    
-    //동기화 관리
-    private List<Vector2Int> enemyPiecesList = new List<Vector2Int>();
-    int [] myChessPiecesX;
-    int [] myChessPiecesY;
-    int newnewY = 0;
-    private PhotonView PV;
 
-    //GAME OBJECT 관리
-    public Camera camera;
-    private GameObject lastHitObject;
-    private GameObject[,] chessPieces = new GameObject[8,8]; //각 좌표에 할당될 기물들 생성
+    [SerializeField] private TileManager tileManager; // TileManager 참조
+    [SerializeField] private Camera mainCamera; // 메인 카메라 참조
     [SerializeField] private GameObject[] cubes; // 보드의 타일
+    [SerializeField] private string knightWhitePrefabName = "knightWhite"; // White Knight 프리팹 이름
+    [SerializeField] private string knightBlackPrefabName = "knightBlack"; // Black Knight 프리팹 이름
+    private GameObject[,] chessPieces = new GameObject[8, 8]; // 보드의 기물 배열
     private GameObject selectedPiece = null; // 현재 선택된 기물
-    private bool isHoldingStart = false;
-    [SerializeField] private float selectedYOffset = 1f;
     private Vector2Int selectedPiecePosition = new Vector2Int(-1, -1); // 선택된 기물의 좌표
-    private Vector2Int selectedCheckPosition = new Vector2Int(-1, -1); //확인용 기물 좌표
-    public GameObject vfxSelectedPrefab; //선택한 기물 아래 생성할 vfx
-    private GameObject selectedVfx; //선택한 기물 효과 vfx 관리용
-    private GameObject myKnight;
 
-    //GAME OBJECT 타일 material
-    public Material originalTileMaterial;
-    public Material rainbowTileMaterial;
-    public Material selectedTileMaterial;
-    private Renderer selectedTileRenderer;
+    private PhotonView photonView; // PhotonView 참조
+    private int myTurn = -1; // 현재 플레이어의 턴 상태 (1 = 내 턴, 0 = 상대 턴)
+    private int myTeam = -1;
+    
+    //UI
+    private int originalLayer;
 
-    //기물 위치 관리
-    [SerializeField] private float yOffset = 0.05f;
-    [SerializeField] private float xzOffset = 0.5f;
-
-    //기물이 갈 수 있는 위치 관리
-    List<Vector2Int> availablePosition = new List<Vector2Int>();
-
-    //애니메이션 처리 관리
-    public float moveDuration = 0.5f; // 이동 애니메이션 지속 시간
-
-    private Animator pieceAnimator;
 
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     private void Start()
     {
-        PhotonNetwork.AddCallbackTarget(this);
-        PV = GetComponent<PhotonView>();
-        if (PV == null)
+        photonView = GetComponent<PhotonView>();
+        if (photonView == null)
         {
-            Debug.LogError("PhotonView component not found on this GameObject!");
+            Debug.LogError("PhotonView component not found!");
+            return;
         }
+
+        // 타일 초기화
+        tileManager.InitializeTiles(cubes);
+
+        // Photon 네트워크 관련 초기화
+        PhotonNetwork.AddCallbackTarget(this);
     }
 
     private void Update()
     {
-        RaycastHit info;
-        Ray ray = camera.ScreenPointToRay(Input.mousePosition);
-
-        if(Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Tile", "Hover")) && myTurn == 1) //타일 오브젝트에 레이 발사해서 정보 가져오기
+        if (Input.GetMouseButtonDown(0)) // 좌클릭 입력 처리
         {
-            GameObject hitObj = info.collider.gameObject;
-            int tileLayer = LayerMask.NameToLayer("Tile");
-            Vector3 hitPosition = info.point;
-
-
-            //ray맞은 타일이랑 lastHit타일이랑 다르면, lastHit타일을 원래 레이어인 tile로 변경경
-            if(lastHitObject != null && lastHitObject != hitObj)
-            {
-                lastHitObject.layer = originalLayer;
-            }
-
-            //ray맞은 타일이 tile 레이어면, 즉 레이에 맞게된 시작 시점이면, hover로 변경.
-            if(hitObj.layer == tileLayer)
-            {
-                originalLayer = hitObj.layer;
-                hitObj.layer = LayerMask.NameToLayer("Hover");
-                lastHitObject = hitObj;
-            }
-
-            //첫번째 클릭 시작
-            if(Input.GetMouseButtonDown(0) && selectedPiece == null) //좌클릭 + 선택한 기물 없음 + 들고잇는 기물 없음
-            {
-                Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}");
-                //해당 위치에 체스 기물이 있다면
-                if(chessPieces[(int)hitPosition.x, (int)hitPosition.z] != null)
-                {
-                    Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}에는 기물 존재");
-                    selectedPiece = chessPieces[(int)hitPosition.x, (int)hitPosition.z]; //그 기물 선택한걸로 취급
-                    pieceAnimator = selectedPiece.GetComponent<Animator>();
-                    selectedTileRenderer = hitObj.GetComponent<Renderer>();
-                    selectedPiecePosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z); //해당 기물 좌표 저장
-                    isHoldingStart = true;
-                }
-            }
-
-            if(Input.GetMouseButtonDown(0) && selectedPiece != null && !isHoldingStart) //좌클릭 + 선택한 기물 있음
-            {
-                selectedCheckPosition = new Vector2Int((int)hitPosition.x, (int)hitPosition.z);
-            }
-
-            if(Input.GetMouseButtonUp(0) && selectedPiece != null && !isHoldingStart) //좌클릭 해제 + 선택한 기물 있음 + 첫 기물 선택 후 떼는 동작이 아님
-            {
-                Debug.Log($"{(int)hitPosition.x}, {(int)hitPosition.z}입니다");
-                Debug.Log($"{selectedPiecePosition.x}, {selectedPiecePosition.y}입니다!");
-
-                //같은곳 선택했으면 이동한것으로 처리 x
-                if((int)hitPosition.x == selectedPiecePosition.x && (int)hitPosition.z == selectedPiecePosition.y)
-                {
-                    //기물 착지시키기
-                    Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
-                    //기물 아래 vfx 없애기
-                    Destroy(selectedVfx);
-                    //뜬 기물 아래 타일 효과 없애기
-                    selectedTileRenderer.material = originalTileMaterial;
-
-                    selectedPiece = null; //잡았던 기물 초기화
-                    selectedTileRenderer = null;
-                    pieceAnimator = null;
-                    selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
-                    selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
-
-                    availableTileRefresh();
-                    availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
-                }
-                //누른곳과 다른곳에 떨궈도 이동한것으로 처리 x
-                else if((int)hitPosition.x != selectedCheckPosition.x && (int)hitPosition.z!=selectedCheckPosition.y)
-                {
-                    //기물 착지시키기
-                    Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                    chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
-                    //기물 아래 vfx 없애기
-                    Destroy(selectedVfx);
-                    //뜬 기물 아래 타일 효과 없애기
-                    selectedTileRenderer.material = originalTileMaterial;
-
-                    selectedPiece = null; //잡았던 기물 초기화
-                    selectedTileRenderer = null;
-                    pieceAnimator = null;
-                    selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
-                    selectedCheckPosition = new Vector2Int(-1, -1); //확인용 좌표 초기화
-
-                    availableTileRefresh();
-                    availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
-                }
-                else if((int)hitPosition.x == selectedCheckPosition.x && (int)hitPosition.z ==selectedCheckPosition.y)
-                {
-                    if(availablePosition.Contains(selectedCheckPosition)){ //갈 수 있는 위치라면 가기
-                        //선택 종료했으니 vfx 이펙트 삭제
-                        Destroy(selectedVfx);
-                        //뜬 기물 아래 타일 효과 없애기
-                        selectedTileRenderer.material = originalTileMaterial;
-
-                        // Vector3 newPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
-                        // chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
-
-                        Vector3 startPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                        Vector3 endPos = new Vector3((int)hitPosition.x + xzOffset, yOffset, (int)hitPosition.z + xzOffset);
-                        StartCoroutine(MovePieceSmooth(chessPieces[selectedPiecePosition.x, selectedPiecePosition.y], startPos, endPos));
-
-                        chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; //원래있던 위치 없애기
-                        chessPieces[(int)hitPosition.x, (int)hitPosition.z] = selectedPiece; //잡은 기물을 이동할 위치로 옮기기
-
-                        // TODO
-                        myChessPiecesX = new int[1];
-                        myChessPiecesY = new int[1];
-                        int index = 0;
-                        for (int x = 0; x < 8; x++)
-                        {
-                            for (int y = 0; y < 8; y++)
-                            {
-                                if(chessPieces[x, y] != null)
-                                {
-                                    myChessPiecesX[index] = x;
-                                    myChessPiecesY[index] = y;
-                                    Debug.Log($"{myChessPiecesX[0]}, {myChessPiecesY[0]} add");
-                                    index++;
-                                }
-                            }
-                        }
-
-                        Debug.Log($"myChessPieces넣기 완료");
-
-                        if (PV != null)
-                            {
-                                // 오너쉽 요청 (필요시)
-                                if (!PV.IsMine && myTurn == 1)
-                                {
-                                    PV.RequestOwnership();
-                                }
-                                // RPC 호출 조건 변경
-                                if (myTurn == 1) // 👉 턴 시스템과 연동
-                                    {
-                                        //TODO
-                                        PV.RPC("enemyChessPiecesUpdate", RpcTarget.All, myChessPiecesX, myChessPiecesY);
-                                        Debug.Log($"Sent fin!");
-                                    }
-                            }
-
-
-                        selectedPiece = null; //잡았던 기물 초기화
-                        selectedTileRenderer = null;
-                        pieceAnimator = null;
-                        selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
-                        availableTileRefresh();
-                        availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
-
-                        ChangeTurn();
-                    }
-                    else //갈 수 없는 위치라면 
-                    {
-                        //기물 착지시키기
-                        Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                        chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
-                        //기물 아래 vfx 없애기
-                        Destroy(selectedVfx);
-                        //뜬 기물 아래 타일 효과 제거
-                        selectedTileRenderer.material = originalTileMaterial;
-
-                        selectedPiece = null; //잡았던 기물 초기화
-                        selectedTileRenderer = null;
-                        pieceAnimator = null;
-
-                        availableTileRefresh();
-                        availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
-                        selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
-                    }
-                    
-                }
-
-            }
-
-            //첫번째 고르고 타일에다가 커서를 두고 떼는 경우
-            if(Input.GetMouseButtonUp(0) && isHoldingStart)
-            {
-                //기물 띄우기
-                Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, selectedYOffset + yOffset, selectedPiecePosition.y + xzOffset);
-                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
-                //기물 아래 vfx 나오게 하기
-                Vector3 vfxPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                selectedVfx = Instantiate(vfxSelectedPrefab, vfxPos, Quaternion.identity);
-                //뜬 기물 아래 타일 효과
-                selectedTileRenderer.material = rainbowTileMaterial;
-                //고른 기물이 갈 수 있는 위치 계산
-                findAvailableMoves(selectedPiece, selectedPiecePosition.x, selectedPiecePosition.y);
-
-                isHoldingStart = false;
-            }
-
-
+            HandleMouseClick();
         }
-        //레이가 안맞은 경우
-        else
+    }
+
+    private void HandleMouseClick()
+    {
+        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+        if (Physics.Raycast(ray, out RaycastHit hit))
         {
-            //첫번째 고르고 밖에다 커서를 두고 떼는 경우
-            if(Input.GetMouseButtonUp(0) && isHoldingStart)
+            Vector3 hitPosition = hit.point;
+            GameObject hitObject = hit.collider.gameObject;
+
+            int x = Mathf.FloorToInt(hitPosition.x);
+            int y = Mathf.FloorToInt(hitPosition.z);
+
+            if (selectedPiece == null) // 기물을 선택하는 경우
             {
-                //기물 띄우기
-                Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, selectedYOffset + yOffset, selectedPiecePosition.y + xzOffset);
-                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
-                //기물 아래 vfx 나오게 하기
-                Vector3 vfxPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                selectedVfx = Instantiate(vfxSelectedPrefab, vfxPos, Quaternion.identity);
-                //뜬 기물 아래 타일 효과
-                selectedTileRenderer.material = rainbowTileMaterial;
-
-                //고른 기물이 갈 수 있는 위치 계산
-                findAvailableMoves(selectedPiece, selectedPiecePosition.x, selectedPiecePosition.y);
-
-                isHoldingStart = false;
+                SelectPiece(x, y);
             }
-
-            //고른 상태에서 밖에 커서를 두고 떼는 경우
-            if(Input.GetMouseButtonUp(0) && selectedPiece != null && !isHoldingStart)
-            {
-                //기물 착지시키기
-                Vector3 newPos = new Vector3(selectedPiecePosition.x + xzOffset, yOffset, selectedPiecePosition.y + xzOffset);
-                chessPieces[selectedPiecePosition.x, selectedPiecePosition.y].transform.position = newPos; //이동
-                //기물 아래 vfx 없애기
-                Destroy(selectedVfx);
-                //뜬 기물 아래 타일 효과 제거
-                selectedTileRenderer.material = originalTileMaterial;
-
-                selectedPiece = null; //잡았던 기물 초기화
-                selectedTileRenderer = null;
-                pieceAnimator = null;
-                selectedPiecePosition = new Vector2Int(-1, -1); //잡았던 기물 위치 초기화
-                
-                availableTileRefresh();
-                availablePosition = new List<Vector2Int>(); //갈 수 있는 위치 초기화
+            else // 선택된 기물을 이동시키는 경우
+            {   
+                MoveSelectedPiece(x, y);
             }
+        }
+    }
 
-            if(lastHitObject != null)
-            {
-                lastHitObject.layer = originalLayer;
-                lastHitObject = null;
-            }   
+    private void SelectPiece(int x, int y)
+    {
+        if (chessPieces[x, y] != null) // 해당 위치에 기물이 있는 경우
+        {
+            selectedPiece = chessPieces[x, y];
+            selectedPiecePosition = new Vector2Int(x, y);
+
+            // 이동 가능한 위치 계산 및 하이라이트 요청
+            List<Vector2Int> availableMoves = selectedPiece.GetComponent<BasePiece>().GetAvailableMoves();
+            tileManager.HighlightTiles(availableMoves);
+        }
+    }
+
+    private void MoveSelectedPiece(int targetX, int targetY)
+    {
+        Vector2Int targetPosition = new Vector2Int(targetX, targetY);
+
+        if (tileManager.IsHighlighted(targetPosition)) // 타일이 하이라이트된 위치인지 확인
+        {
+            BasePiece pieceScript = selectedPiece.GetComponent<BasePiece>();
+            pieceScript.Move(targetPosition); // 기물 이동
+
+            chessPieces[selectedPiecePosition.x, selectedPiecePosition.y] = null; // 기존 위치 비우기
+            chessPieces[targetX, targetY] = selectedPiece; // 새 위치에 기물 배치
+
+            tileManager.ResetTiles(); // 타일 상태 초기화
+            selectedPiece = null; // 선택된 기물 초기화
+
+            ChangeTurn(); // 턴 변경 처리
         }
     }
 
@@ -392,96 +186,34 @@ public class Board : MonoBehaviourPunCallbacks
     //기물 관련련
     private void SpawnAllPieces()
     {
-        //추가 예정정
-        SpawnMyKnight();
-    }
-
-    private void SpawnMyKnight() //퀸 생성
-    {
-        Vector3 spawnPos = myTeam == 0 
-        ? new Vector3(0 + xzOffset, 0 + yOffset, 0 + xzOffset)
-        : new Vector3(0 + xzOffset, 0 + yOffset, 7 + xzOffset);
-
-        string knightPrefab = myTeam == 0 ? "KnightLight" : "KnightBlack";
-        Quaternion rotation = myTeam == 0 ? Quaternion.Euler(0, 0, 0) : Quaternion.Euler(0, 180, 0);
-
-        myKnight = PhotonNetwork.Instantiate(knightPrefab, spawnPos, rotation);
-
-        int gridX = myTeam == 0 ? 0 : 0;
-        int gridY = myTeam == 0 ? 0 : 7;
-
-        chessPieces[gridX, gridY] = myKnight;
-        Debug.Log($"{myTeam}팀이고,{gridX}, {gridY}에{chessPieces[gridX, gridY]}생성완료");
-    }
-
-    private void findAvailableMoves(GameObject objectName, int x, int y)
-    {
-        if (objectName == myKnight) // 나이트인 경우
+        // 자신의 팀에 맞는 나이트만 생성
+        if (myTeam == 0) // 팀 A (White)
         {
-            availablePosition = new List<Vector2Int>();
-
-            // 이동 방향 (상, 하, 좌, 우)
-            int[,] directions = new int[,] {
-                { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } // 위, 아래, 왼쪽, 오른쪽
-            };
-
-            for (int d = 0; d < 4; d++) // 네 방향 탐색
-            {
-                for (int step = 1; step <= 2; step++) // 최대 2칸까지 이동 가능
-                {
-                    int newX = x + directions[d, 0] * step;
-                    int newY = y + directions[d, 1] * step;
-
-                    // 보드 범위를 벗어나지 않는지 확인
-                    if (newX >= 0 && newX < 8 && newY >= 0 && newY < 8)
-                    {
-                        // 해당 위치에 기물이 없을 경우만 추가
-                        if (chessPieces[newX, newY] == null)
-                        {
-                            availablePosition.Add(new Vector2Int(newX, newY));
-                        }
-                        else // 기물이 있으면 더 이상 해당 방향으로 이동 불가
-                        {
-                            break;
-                        }
-                    }
-                }
-            }
-
-            //availablePosition으로 해당 타일 변경하기
-            foreach (Vector2Int pos in availablePosition)
-            {
-                int index = pos.x + pos.y * 8;
-                if (index < cubes.Length && cubes[index] != null)
-                {
-                    Renderer renderer = cubes[index].GetComponent<Renderer>();
-                    renderer.material = selectedTileMaterial;
-                }
-            }
-
-
-            // 가능한 위치 출력 (디버깅용)
-            foreach (var move in availablePosition)
-            {
-                Debug.Log($"특수 나이트 이동 가능: ({move.x}, {move.y})");
-            }
+            SpawnPiece<Knight>(new Vector2Int(0, 0)); // White Knight 생성
+        }
+        else if (myTeam == 1) // 팀 B (Black)
+        {
+            SpawnPiece<Knight>(new Vector2Int(7, 7)); // Black Knight 생성
         }
     }
 
-    private void availableTileRefresh(){
+    private void SpawnPiece<T>(Vector2Int position) where T : BasePiece
+    {
+        // 팀에 따라 사용할 프리팹 이름 결정
+        string prefabName = (myTeam == 0) ? knightWhitePrefabName : knightBlackPrefabName;
 
-        //availablePosition 타일 복귀귀
-        foreach (Vector2Int pos in availablePosition)
-        {
-            int index = pos.x + pos.y * 8;
-            if (index < cubes.Length && cubes[index] != null)
-            {
-                Renderer renderer = cubes[index].GetComponent<Renderer>();
-                renderer.material = originalTileMaterial;
-            }
-        }
+        // PhotonNetwork를 통해 기물 생성
+        GameObject pieceObj = PhotonNetwork.Instantiate(prefabName,
+        new Vector3(position.x + 0.5f, 0.05f, position.y + 0.5f), Quaternion.identity);
 
+        // 생성된 기물 초기화
+        T pieceScript = pieceObj.GetComponent<T>();
+        pieceScript.Initialize(position, this);
+
+        // 보드 배열에 기물 등록
+        chessPieces[position.x, position.y] = pieceObj;
     }
+
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
@@ -504,45 +236,4 @@ public class Board : MonoBehaviourPunCallbacks
         }
     }
 
-    // private void UpdateMyChessPiecesList()
-    // {
-    //     myChessPieces.Clear();
-    //     myChessPieces.Add(new Vector2Int(3, 3));
-    //     myChessPieces.Add(new Vector2Int(3, 4));
-    //     myChessPieces.Add(new Vector2Int(4, 3));
-    //     myChessPieces.Add(new Vector2Int(4, 4));
-    // }
-
-    [PunRPC]
-    private void enemyChessPiecesUpdate(int []xArr, int []yArr)
-    {
-
-        enemyPiecesList.Clear();
-
-        for (int i = 0; i < xArr.Length; i++)
-        {
-            enemyPiecesList.Add(new Vector2Int(xArr[i], yArr[i]));
-        }
-
-        // 디버그 정보 출력
-        Debug.Log($"Enemy pieces updated: {xArr.Length} 개의 좌표 received");
-        Debug.Log($"{enemyPiecesList[0].x}, {enemyPiecesList[0].y} received");
-    }
-
-    //애니메이션 관련
-
-    private IEnumerator MovePieceSmooth(GameObject piece, Vector3 startPos, Vector3 endPos)
-    {
-        float elapsedTime = 0;
-        pieceAnimator.SetTrigger("Attack");
-        yield return new WaitForSeconds(0.49f);
-        while (elapsedTime < moveDuration)
-        {
-            piece.transform.position = Vector3.Lerp(startPos, endPos, elapsedTime / moveDuration);
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        piece.transform.position = endPos; // 정확한 최종 위치 설정
-    }
-    
 }
