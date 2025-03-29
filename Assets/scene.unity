@@ -1010,6 +1010,14 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 330585545}
     - target: {fileID: 2828281151604369852, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
+      propertyPath: mainCamera
+      value: 
+      objectReference: {fileID: 330585545}
+    - target: {fileID: 2828281151604369852, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
+      propertyPath: tileManager
+      value: 
+      objectReference: {fileID: 1500696094}
+    - target: {fileID: 2828281151604369852, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
       propertyPath: moveDuration
       value: 0.1
       objectReference: {fileID: 0}
@@ -1352,8 +1360,30 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1813109882146917129, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
+      insertIndex: 4
+      addedObject: {fileID: 1500696094}
   m_SourcePrefab: {fileID: 100100000, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
+--- !u!1 &1500696093 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1813109882146917129, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
+  m_PrefabInstance: {fileID: 1500696092}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1500696094
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1500696093}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 918ecf3b124da2f47b897212da0d4b67, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  originalTileMaterial: {fileID: 2100000, guid: e62b5674debd37d48853b782f1e82005, type: 2}
+  selectedTileMaterial: {fileID: 2100000, guid: 84125f537f9f93140b39fc06d19bc926, type: 2}
 --- !u!1 &1602699186 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4040811000102686386, guid: e551790f1fceae2419ff27fd8a41255a, type: 3}
