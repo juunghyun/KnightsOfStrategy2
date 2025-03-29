@@ -64,12 +64,19 @@ public class Board : MonoBehaviourPunCallbacks
             int x = Mathf.FloorToInt(hitPosition.x);
             int y = Mathf.FloorToInt(hitPosition.z);
 
+            // 보드 경계 체크
+            if (x < 0 || x >= 8 || y < 0 || y >= 8)
+            {
+                Debug.LogWarning("보드 바깥쪽을 클릭했습니다!");
+                return;
+            }
+
             if (selectedPiece == null) // 기물을 선택하는 경우
             {
                 SelectPiece(x, y);
             }
             else // 선택된 기물을 이동시키는 경우
-            {   
+            {
                 MoveSelectedPiece(x, y);
             }
         }
@@ -90,6 +97,12 @@ public class Board : MonoBehaviourPunCallbacks
 
     private void MoveSelectedPiece(int targetX, int targetY)
     {
+        if (myTurn != 1) // 내 턴이 아닌 경우
+        {
+            Debug.LogWarning("현재 내 턴이 아닙니다!");
+            return;
+        }
+
         Vector2Int targetPosition = new Vector2Int(targetX, targetY);
 
         if (tileManager.IsHighlighted(targetPosition)) // 타일이 하이라이트된 위치인지 확인
@@ -236,4 +249,19 @@ public class Board : MonoBehaviourPunCallbacks
         }
     }
 
+    public bool IsValidTile(int x, int y)
+    {
+        // 보드 경계 확인 (0 <= x, y < 8)
+        return x >= 0 && x < 8 && y >= 0 && y < 8;
+    }
+
+    public bool IsTileEmpty(int x, int y)
+    {
+        // 유효한 타일인지 먼저 확인
+        if (!IsValidTile(x, y))
+            return false;
+
+        // 해당 좌표에 기물이 없으면 true 반환
+        return chessPieces[x, y] == null;
+    }
 }

@@ -29,9 +29,12 @@ public class TileManager : MonoBehaviour
         {
             if (IsValidPosition(pos))
             {
-                Renderer renderer = tiles[pos.x, pos.y].GetComponent<Renderer>();
+                Renderer renderer = tiles[pos.y, pos.x].GetComponent<Renderer>();
                 renderer.material = selectedTileMaterial;
                 highlightedTiles.Add(pos); // 하이라이트된 위치 저장
+            }else
+            {
+                Debug.LogWarning($"Invalid position for highlighting: {pos}");
             }
         }
     }

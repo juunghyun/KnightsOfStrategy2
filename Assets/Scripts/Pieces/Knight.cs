@@ -19,8 +19,7 @@ public class Knight : BasePiece
                 int newX = Position.x + directions[d, 0] * step;
                 int newY = Position.y + directions[d, 1] * step;
 
-                // if (board.IsValidTile(newX, newY) && board.IsTileEmpty(newX, newY))
-                if(true)
+                if (board.IsValidTile(newX, newY) && board.IsTileEmpty(newX, newY))
                 {
                     moves.Add(new Vector2Int(newX, newY));
                 }
